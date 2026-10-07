@@ -2,9 +2,11 @@
 
 **val_bpb 1.05670** (3-seed mean, std 0.00015) on FineWeb · 8×H100 SXM · 600s train / 600s eval · ≤15.95 MB artifact
 
-My submission to OpenAI's [Parameter Golf](https://openai.com/index/parameter-golf/) challenge: train the best language model that fits in 16MB, in 10 minutes on 8×H100s. At submission time (May 1, 2026) it beat the merged leaderboard record (**1.06108**, PR #1855) by 0.00438 BPB and the best open PR (**1.05759**, PR #2014) by 0.00089 BPB.
+My record-candidate submission to OpenAI's [Parameter Golf](https://openai.com/index/parameter-golf/) challenge: train the best language model that fits in 16MB, in 10 minutes on 8×H100s.
 
-- Submission PR: `[ADD LINK]`
+> **Status: result under review for a train/validation overlap.** After I submitted, an audit ([Issue #2127](https://github.com/openai/parameter-golf/issues/2127)) found that the shared `prepare_caseops_data.py` script defaults to `--val-docs=10000`. With that default, training shards start at document 10,000 while validation covers documents 0–50,000, so roughly 80% of the validation documents also appear in training. This submission inherited that default from the CaseOps / PR #1797 lineage it builds on, along with 14 other flagged submissions, and a maintainer recommended excluding it. **Treat 1.05670 as optimistic until it is re-run.** A clean re-run on the canonical disjoint split (`--val-docs=50000`) is planned.
+
+- Submission PR: [openai/parameter-golf#2130](https://github.com/openai/parameter-golf/pull/2130)
 - Full sprint history (173 run logs, every branch): [TanishGudise/parameter-golf](https://github.com/TanishGudise/parameter-golf)
 
 ![Sprint progression](assets/sprint_progression.png)
@@ -35,7 +37,7 @@ I built on the public SP8192 CaseOps / PR #1797 lineage. My contribution is the 
 |---|---|---|---|
 | Base | PR #1797 port | 1.06181 | starting point |
 | S5 | K+O LoRA ablation, EMA 0.9975 | 1.06094 | |
-| S14 | PR #1855 TTT bundle, MLP LoRA on | 1.06067 | beat #1855's 3-seed mean on 1 seed |
+| S14 | PR #1855 TTT bundle, MLP LoRA on | 1.06067 | below #1855's 3-seed mean on 1 seed |
 | S15 | + BOS SmearGate leak fix | 1.06196 | **regressed**: other hparams compensated for the leak |
 | S21 | NUM_PHASES=2 | 1.05961 | |
 | S25 | K-LoRA off (O + MLP only) | 1.05935 | |
@@ -72,7 +74,8 @@ I built on the public SP8192 CaseOps / PR #1797 lineage. My contribution is the 
 - **Score-first TTT** (PR #402): each chunk is scored before it is used for training, and the last chunk of each document is never trained on.
 - **Causal n-gram channel**: `online_ngram_state.c` emits a hint for position *i* from tokens [0..i−1] and only then absorbs token *i*.
 - **Probability mass preserved**: the tilt adds a boost and then renormalizes through softmax.
-- **No validation-data leakage**: GPTQ calibration uses only training shards, and its time counts against the training budget.
+- **GPTQ calibration** uses only training shards, and its time counts against the training budget.
+- **Known issue — data split:** the training shards were built with the default `--val-docs=10000`, which overlaps the scored validation set (see the Status note at the top and [Issue #2127](https://github.com/openai/parameter-golf/issues/2127)). The eval-time rules above hold, but the split itself is not clean.
 
 ## Reproduce
 
